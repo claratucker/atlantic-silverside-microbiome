@@ -1,5 +1,5 @@
-# 16S-microbiome-dada2-pipeline
-End-to-end 16S microbiome analysis using QIIME1, QIIME2, and DADA2
+# atlantic-silverside-microbiome
+Microbiome analysis of Atlantic silversides under varying temperature and pH conditions using QIIME2 and DADA2
 
 ## Data Access
 
