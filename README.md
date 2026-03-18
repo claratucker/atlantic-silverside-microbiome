@@ -39,9 +39,9 @@ Increasing atmospheric CO2 levels intensify ocean warming and acidification, whi
 **Figure 3**: _Pairwise unweighted UniFrac distances within and between developmental timepoints. Between-age distances (1 dph vs. 10 dph) are significantly greater than within-age distances (p < 0.001), confirming that microbiome composition shifts substantially over early development regardless of treatment._
 
 ## Presentations & Recognition
-This project was presented at the **URECA (Undergraduate Research & Creative Activities) 
-Symposium at Stony Brook University (2018)**. The abstract and poster are available in 
-the [`Results/`](Results/) folder.
+reliminary findings were presented at the [2018 URECA Undergraduate Research 
+Symposium](Results/URECA%202018%20Symposium%20Abstract.pdf) at Stony Brook University. 
+The abstract and poster are available in the [`Results/`](Results/) folder.
 
 ## Broader Goals
 - Predict holobiont fitness under future ocean conditions.
@@ -52,7 +52,7 @@ the [`Results/`](Results/) folder.
 - Data preprocessing: FastQ files demultiplexed and primers removed using QIIME2 cutadapt.
 - Quality control and trimming: QIIME2 and DADA2 pipelines for filtering, trimming, and denoising.
 
-## Diversity analysis
+## Diversity Analysis
 - Alpha diversity (Shannon, Simpson, Observed species)
 - Beta diversity (Bray–Curtis, Unifrac)
 - PERMANOVA and PERMDISP tests
