@@ -26,6 +26,15 @@ Increasing atmospheric CO2 levels intensify ocean warming and acidification, whi
 - Temperature increases microbial diversity (p < 0.05), while pH alone has no significant effect.
 - At 10 dph, temperature and pH interact to affect alpha diversity and microbiome composition (p < 0.05).
 
+### Alpha Diversity
+![Alpha Diversity](Results/alpha-diversity.png)
+
+### Beta Diversity – Age Effect
+![Age PERMANOVA](Results/Age-permanova.png)
+
+### Developmental Timepoint Distances
+![Developmental Timepoint Distances](Results/Developmental-Timepoint-Distances.png)
+
 ## Broader Goals
 - Predict holobiont fitness under future ocean conditions.
 - Provide insight into potential acclimation or adaptation of fish microbiomes to environmental change.
@@ -35,7 +44,7 @@ Increasing atmospheric CO2 levels intensify ocean warming and acidification, whi
 - Data preprocessing: FastQ files demultiplexed and primers removed using QIIME2 cutadapt.
 - Quality control and trimming: QIIME2 and DADA2 pipelines for filtering, trimming, and denoising.
 
-## Diversity analysis:
+## Diversity analysis
 - Alpha diversity (Shannon, Simpson, Observed species)
 - Beta diversity (Bray–Curtis, Unifrac)
 - PERMANOVA and PERMDISP tests
