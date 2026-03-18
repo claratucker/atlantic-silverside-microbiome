@@ -1,0 +1,181 @@
+---
+title: "Atlantic Silverside Microbiome Analysis Workflow with Statistical Analysis"
+author: "Clara C. Tucker"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+# Introduction
+
+Increasing atmospheric CO2 levels intensify ocean warming and acidification, impacting marine organism fitness. This project examines the combined effects of these stressors on Atlantic silverside (*Menidia menidia*) holobionts.  
+
+**Experimental design**:
+
+- Preliminary 2x2 factorial: temperatures 17°C, 24°C; pH 7.2, 8.2; fish ages 0 dph, 10 dph; 3 biological replicates per treatment  
+- Ongoing 3x3 factorial: temperatures 17°C, 20°C, 24°C; pH 7.2, 7.5, 8.2; fish 10 dph  
+
+This pipeline integrates **QIIME1, QIIME2, DADA2**, and downstream **statistical analyses**.
+
+---
+
+# 1. Data Preparation and FASTQ Conversion (QIIME1)
+
+```bash
+# Convert FASTA + QUAL to FASTQ
+convert_fastaqual_fastq.py -f input.fasta -q input.qual -o output_dir -c fasta_qual_to_fastq -F -b
+
+# Check number of lines
+wc -l output_dir/input.fastq
+
+# Split large FASTQ files into manageable parts
+# Use fastq-splitter: http://kirill-kryukov.com/study/tools/fastq-splitter/
+
+# 2. Barcode Extraction and Validation
+# Extract barcodes (Mr. DNA data)
+extract_barcodes.py -f input.fastq -o output_dir -c barcode_paired_stitched -l --bc1_len 8 --bc2_len 8
+
+# Validate mapping file
+check_id_map.py -m mapping_file.txt -o output_dir
+
+# 3. Demultiplexing and Quality Filtering (QIIME1)
+# Split libraries and assign barcodes
+split_libraries_fastq.py -i split_fastq_part.fastq -b barcodes.fastq -m mapping_file.txt --barcode_type hamming_8 -o output_dir
+
+# Validate demultiplexed sequences
+validate_demultiplexed_fasta.py -m mapping_file.txt -i seqs.fna -o output_dir
+
+# 4. OTU Picking (QIIME1)
+# Closed-reference OTU picking
+pick_closed_reference_otus.py -i seqs.fna -o otu_output_dir
+#Export OTU tables for Excel-based contaminant filtering.
+
+# 5. Import to QIIME2
+qiime tools import \
+  --type EMPSingleEndSequences \
+  --input-path Exp1_directory \
+  --output-path Exp1_emp-single-end-sequences.qza
+
+qiime tools import \
+  --type EMPSingleEndSequences \
+  --input-path Exp23_directory \
+  --output-path Exp23_emp-single-end-sequences.qza
+
+# 6. Demultiplexing and Primer Removal (QIIME2)
+# Demultiplex
+qiime demux emp-single \
+  --i-seqs Exp1_emp-single-end-sequences.qza \
+  --m-barcodes-file Exp1_mapping.txt \
+  --m-barcodes-category BarcodeSequence \
+  --o-per-sample-sequences Exp1_demux.qza
+
+qiime demux emp-single \
+  --i-seqs Exp23_emp-single-end-sequences.qza \
+  --m-barcodes-file Mapping_2.txt \
+  --m-barcodes-category BarcodeSequence \
+  --o-per-sample-sequences Exp23_demux.qza
+
+# Primer trimming
+qiime cutadapt trim-single \
+  --i-demultiplexed-sequences Exp1_demux.qza \
+  --p-front GTGYCAGCMGCCGCGGTA \
+  --p-error-rate 0 \
+  --o-trimmed-sequences trimmed_Exp1.qza
+
+qiime cutadapt trim-single \
+  --i-demultiplexed-sequences Exp23_demux.qza \
+  --p-front GTGYCAGCMGCCGCGGTA \
+  --p-error-rate 0 \
+  --o-trimmed-sequences trimmed_Exp23.qza
+
+# 7. DADA2 Pipeline in R
+library(dada2)
+library(phyloseq)
+
+# Paths to trimmed FASTQ
+trimmed_path1 <- "trimmed_Exp1"
+trimmed_path23 <- "trimmed_Exp23"
+
+fastqFs1 <- list.files(trimmed_path1, pattern="fastq", full.names=TRUE)
+fastqFs23 <- list.files(trimmed_path23, pattern="fastq", full.names=TRUE)
+
+filtpathF1 <- file.path(trimmed_path1, "filtered")
+filtpathF23 <- file.path(trimmed_path23, "filtered")
+
+filterAndTrim(fwd=fastqFs1, filt=file.path(filtpathF1, basename(fastqFs1)), truncLen=250, trimLeft=30)
+filterAndTrim(fwd=fastqFs23, filt=file.path(filtpathF23, basename(fastqFs23)), truncLen=250, trimLeft=30)
+
+# Dereplication
+derepFs1 <- derepFastq(list.files(filtpathF1, full.names=TRUE))
+derepFs23 <- derepFastq(list.files(filtpathF23, full.names=TRUE))
+
+# Learn error rates
+errFs1 <- learnErrors(list.files(filtpathF1, full.names=TRUE))
+errFs23 <- learnErrors(list.files(filtpathF23, full.names=TRUE))
+
+# Sample inference
+dadaFs1 <- dada(derepFs1, err=errFs1)
+dadaFs23 <- dada(derepFs23, err=errFs23)
+
+# OTU tables
+seqtab1 <- makeSequenceTable(dadaFs1)
+seqtab23 <- makeSequenceTable(dadaFs23)
+seqtab_combined <- mergeSequenceTables(seqtab1, seqtab23)
+
+# 8. Alpha Diversity Analysis
+# QIIME1
+compare_alpha_diversity.py -i PD_whole_tree.txt -m mapping.txt -c Treatment -d 100 -o Treatment_PD100
+
+# R Two-way ANOVA
+library(tidyverse)
+
+alpha_data <- read.csv("PD_whole_tree.txt", sep="\t")
+anova_result <- aov(Shannon ~ Temperature * pH, data=alpha_data)
+summary(anova_result)
+TukeyHSD(anova_result)
+
+# 9. Beta Diversity Analysis
+# QIIME1
+# Compute mean/median distance matrices
+dissimilarity_mtx_stats.py -i dists/ -o dist_stats/
+
+# PERMANOVA
+compare_categories.py --method adonis -i unweighted_unifrac_dm.txt -m Fasting_Map.txt -c Treatment -o permanova_out -n 10000
+
+# Boxplots
+make_distance_boxplots.py -d unweighted_unifrac_dm.txt -m Fasting_Map.txt -f "Treatment" -o out1
+
+# Principal Coordinates & 2D plots
+principal_coordinates.py -i beta_div.txt -o beta_div_coords.txt
+make_2d_plots.py -i unweighted_unifrac_pc.txt -m Fasting_Map.txt
+
+# 10. Differential Abundance Analysis
+differential_abundance.py -i otu_table.biom -o diff_otus.txt -m map.txt -a DESeq2_nbinom -c Treatment -x Control -y Fast -d
+
+# 11. OTU Taxonomy Annotation
+for i in $(ls directory_name); do
+    assign_taxonomy.py -i directory_name/$i -m blast -o output_directory/$i
+done
+# 12. Summary
+Age strongly predicts microbiome diversity (alpha & beta)
+
+Temperature increases species richness; pH has minimal effect alone
+
+Temperature x pH interaction affects diversity at 10 dph
+
+Differential abundance identifies OTUs responding to environmental stressors
+
+Results provide insight into holobiont adaptation potential under climate change
+
+# 13. References
+
+https://benjjneb.github.io/dada2/tutorial.html
+http://qiime.org/scripts/
+https://docs.qiime2.org/2023.8/tutorials/moving-pictures/
+https://github.com/qiime2/q2-cutadapt
+https://www.r-bloggers.com/r-tutorial-series-two-way-anova-with-pairwise-comparisons/
+
+
